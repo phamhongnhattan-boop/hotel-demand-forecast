@@ -23,18 +23,24 @@ Download `hotel_bookings.csv` and put it in `data/raw/`.
 | Step | Detail |
 |---|---|
 | Daily series | Non-canceled bookings, each counts as 1 room per night of stay |
-| Split | Train < 2017-03-01, Valid 2017-03 → 05, Test 2017-06 → 08 |
+| Split | Train 2015-08 → 2017-02 (first month skipped: incomplete), Valid 2017-03 → 05, Test 2017-06 → 08 |
 | Features | Weekday, month, day of year, lags ≥ horizon (no leakage), rolling mean/std |
-| Models | Seasonal naive, LightGBM (early stopping), BigQuery ML ARIMA_PLUS |
+| Models | Seasonal naive, LightGBM on the residual (actual − naive, early stopping), BigQuery ML ARIMA_PLUS |
 | Pricing | Occupancy = forecast / capacity (95th percentile of rooms sold) → price multiplier |
 
 ## Results (test period, horizon = 14 days)
 
 | Hotel | Model | MAE | RMSE | MAPE |
 |---|---|---|---|---|
-| City Hotel | Seasonal naive | – | – | – |
-| City Hotel | LightGBM | – | – | – |
+| City Hotel | Seasonal naive | 7.11 | 9.64 | 3.37% |
+| City Hotel | **LightGBM (residual)** | **5.84** | **7.60** | **2.78%** |
 | City Hotel | BigQuery ARIMA_PLUS | – | – | – |
+| Resort Hotel | Seasonal naive | 5.67 | 7.52 | 3.25% |
+| Resort Hotel | **LightGBM (residual)** | **4.76** | **6.36** | **2.75%** |
+| Resort Hotel | BigQuery ARIMA_PLUS | – | – | – |
+
+LightGBM lowers MAE by 18% (City) and 16% (Resort) vs the seasonal naive baseline.
+Note: the test period is high season, when both hotels are almost full, so errors are small for every model.
 
 ![forecast](reports/forecast_city_hotel.png)
 
@@ -69,6 +75,14 @@ src/
 bigquery/         upload script + ARIMA_PLUS SQL
 tests/            unit tests
 ```
+
+## Lesson learned
+
+The first version trained LightGBM on the raw target and dropped every row with a missing `lag_364`.
+That left only 245 training rows; for the Resort Hotel, early stopping kept 1 tree and the model
+predicted close to the yearly average (MAE 28 vs 5.7 for the baseline). Fix: keep rows with missing
+long lags (LightGBM handles NaN) and learn the correction to the naive forecast, so a weak model
+falls back to the baseline instead of the average.
 
 ## Limitations
 
