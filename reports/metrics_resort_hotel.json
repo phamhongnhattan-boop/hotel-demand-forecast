@@ -1,0 +1,15 @@
+{
+  "hotel": "Resort Hotel",
+  "horizon_days": 14,
+  "test_period": "2017-06-01 -> 2017-08-31",
+  "seasonal_naive": {
+    "MAE": 5.674,
+    "RMSE": 7.52,
+    "MAPE_%": 3.25
+  },
+  "lightgbm": {
+    "MAE": 28.389,
+    "RMSE": 28.925,
+    "MAPE_%": 15.97
+  }
+}

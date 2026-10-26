@@ -1,0 +1,15 @@
+{
+  "hotel": "City Hotel",
+  "horizon_days": 14,
+  "test_period": "2017-06-01 -> 2017-08-31",
+  "seasonal_naive": {
+    "MAE": 7.109,
+    "RMSE": 9.638,
+    "MAPE_%": 3.37
+  },
+  "lightgbm": {
+    "MAE": 6.109,
+    "RMSE": 7.838,
+    "MAPE_%": 2.92
+  }
+}
