@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data_prep import build_daily, load_raw  # noqa: E402
-from features import make_features  # noqa: E402
+from features import make_features, naive_lag, split  # noqa: E402
 from pricing import multiplier  # noqa: E402
 from sample_data import make_sample  # noqa: E402
 
@@ -41,6 +41,21 @@ def test_lags_do_not_leak(raw):
     X = make_features(daily, horizon)
     lag_cols = [c for c in X.columns if c.startswith("lag_")]
     assert min(int(c.split("_")[1]) for c in lag_cols) >= horizon
+
+
+def test_naive_lag_is_same_weekday():
+    assert naive_lag(7) == 7
+    assert naive_lag(10) == 14
+    assert naive_lag(14) == 14
+
+
+def test_split_keeps_rows_with_missing_long_lags(raw):
+    daily = build_daily(raw, "City Hotel", "2017-08-31")
+    X = make_features(daily, 14)
+    (X_tr, _), _, (X_te, _) = split(X, 14, "2015-08-01", "2017-03-01", "2017-06-01")
+    assert X_tr["lag_364"].isna().any()      # first year has no lag_364, rows are kept
+    assert X_tr["lag_14"].notna().all()      # the naive base is always present
+    assert X_te.index.min() == pd.Timestamp("2017-06-01")
 
 
 def test_price_multiplier_order():
