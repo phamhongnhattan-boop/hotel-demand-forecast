@@ -1,6 +1,7 @@
 {
   "hotel": "Resort Hotel",
   "horizon_days": 14,
+  "train_rows": 578,
   "test_period": "2017-06-01 -> 2017-08-31",
   "seasonal_naive": {
     "MAE": 5.674,
@@ -8,8 +9,17 @@
     "MAPE_%": 3.25
   },
   "lightgbm": {
-    "MAE": 28.389,
-    "RMSE": 28.925,
-    "MAPE_%": 15.97
+    "MAE": 4.757,
+    "RMSE": 6.36,
+    "MAPE_%": 2.75
+  },
+  "lightgbm_best_iteration": 46,
+  "mae_improvement_%": 16.2,
+  "top_features": {
+    "lag_14": 296,
+    "dayofyear": 230,
+    "roll_std_28": 183,
+    "roll_mean_7": 124,
+    "lag_28": 110
   }
 }

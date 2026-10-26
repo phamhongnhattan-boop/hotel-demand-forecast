@@ -1,6 +1,7 @@
 {
   "hotel": "City Hotel",
   "horizon_days": 14,
+  "train_rows": 578,
   "test_period": "2017-06-01 -> 2017-08-31",
   "seasonal_naive": {
     "MAE": 7.109,
@@ -8,8 +9,17 @@
     "MAPE_%": 3.37
   },
   "lightgbm": {
-    "MAE": 6.109,
-    "RMSE": 7.838,
-    "MAPE_%": 2.92
+    "MAE": 5.836,
+    "RMSE": 7.602,
+    "MAPE_%": 2.78
+  },
+  "lightgbm_best_iteration": 26,
+  "mae_improvement_%": 17.9,
+  "top_features": {
+    "lag_14": 176,
+    "dayofyear": 125,
+    "roll_std_28": 93,
+    "roll_mean_28": 83,
+    "roll_mean_7": 67
   }
 }
