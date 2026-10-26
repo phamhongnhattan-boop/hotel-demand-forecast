@@ -4,6 +4,11 @@ from __future__ import annotations
 import pandas as pd
 
 
+def naive_lag(horizon: int) -> int:
+    """Smallest multiple of 7 that is >= horizon (same weekday, already known at forecast time)."""
+    return -(-horizon // 7) * 7
+
+
 def make_features(daily: pd.DataFrame, horizon: int, target: str = "rooms_sold") -> pd.DataFrame:
     y = daily[target]
     X = pd.DataFrame(index=daily.index)
@@ -17,7 +22,7 @@ def make_features(daily: pd.DataFrame, horizon: int, target: str = "rooms_sold")
     X["weekofyear"] = idx.isocalendar().week.astype(int).to_numpy()
 
     # Lags: same weekday, at least `horizon` days back
-    first_week_lag = -(-horizon // 7) * 7  # round up to a multiple of 7
+    first_week_lag = naive_lag(horizon)
     for lag in (horizon, first_week_lag, first_week_lag + 7, first_week_lag + 14, 364):
         X[f"lag_{lag}"] = y.shift(lag)
 
@@ -32,9 +37,16 @@ def make_features(daily: pd.DataFrame, horizon: int, target: str = "rooms_sold")
     return X
 
 
-def split(X: pd.DataFrame, valid_start: str, test_start: str, target: str = "rooms_sold"):
-    """Time-based split. Rows with missing lags (start of the series) are dropped from train."""
-    train = X[X.index < valid_start].dropna()
+def split(X: pd.DataFrame, horizon: int, train_start: str, valid_start: str, test_start: str,
+          target: str = "rooms_sold"):
+    """Time-based split.
+
+    Rows need the naive lag (it is the base of the forecast). Other missing lags
+    (for example lag_364 in the first year) are kept as NaN: LightGBM handles them.
+    """
+    base = f"lag_{naive_lag(horizon)}"
+    X = X[(X.index >= train_start) & X[base].notna()]
+    train = X[X.index < valid_start]
     valid = X[(X.index >= valid_start) & (X.index < test_start)]
     test = X[X.index >= test_start]
     cols = [c for c in X.columns if c != target]

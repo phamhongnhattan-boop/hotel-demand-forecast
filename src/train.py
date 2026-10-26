@@ -16,7 +16,7 @@ import config
 from data_prep import build_daily, load_raw
 from evaluate import metrics
 from features import make_features, split
-from models import seasonal_naive, train_lgbm
+from models import ResidualLGBM, seasonal_naive
 from pricing import estimate_capacity, suggest_prices
 
 
@@ -31,21 +31,26 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV) -> dict:
     daily = build_daily(raw, hotel, config.DATA_END)
 
     X = make_features(daily, horizon)
-    (X_tr, y_tr), (X_va, y_va), (X_te, y_te) = split(X, config.VALID_START, config.TEST_START)
+    (X_tr, y_tr), (X_va, y_va), (X_te, y_te) = split(
+        X, horizon, config.TRAIN_START, config.VALID_START, config.TEST_START)
 
     # 1) Baseline
-    naive = seasonal_naive(daily["rooms_sold"], X_te.index, horizon)
-    # 2) LightGBM with early stopping on the validation period
-    model = train_lgbm(X_tr, y_tr, X_va, y_va, config.RANDOM_STATE)
-    gbm_pred = pd.Series(model.predict(X_te), index=X_te.index).clip(lower=0)
+    naive = seasonal_naive(X_te, horizon)
+    # 2) LightGBM on the residual (actual - naive), early stopping on the validation period
+    model = ResidualLGBM(horizon, config.RANDOM_STATE).fit(X_tr, y_tr, X_va, y_va)
+    gbm_pred = model.predict(X_te)
 
     results = {
         "hotel": hotel,
         "horizon_days": horizon,
+        "train_rows": len(X_tr),
         "test_period": f"{X_te.index.min().date()} -> {X_te.index.max().date()}",
         "seasonal_naive": metrics(y_te, naive),
         "lightgbm": metrics(y_te, gbm_pred),
+        "lightgbm_best_iteration": model.best_iteration,
     }
+    base_mae = results["seasonal_naive"]["MAE"]
+    results["mae_improvement_%"] = round((base_mae - results["lightgbm"]["MAE"]) / base_mae * 100, 1)
 
     # 3) Price suggestion on the test period
     capacity = estimate_capacity(y_tr)
@@ -61,8 +66,6 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV) -> dict:
     config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     slug = hotel.lower().replace(" ", "_")
     prices.to_csv(config.REPORTS_DIR / f"forecast_{slug}.csv")
-    with open(config.REPORTS_DIR / f"metrics_{slug}.json", "w") as f:
-        json.dump(results, f, indent=2)
 
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.plot(y_te.index, y_te, label="Actual", lw=2)
@@ -72,9 +75,11 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV) -> dict:
     ax.legend()
     fig.tight_layout()
     fig.savefig(config.REPORTS_DIR / f"forecast_{slug}.png", dpi=120)
+    plt.close(fig)
 
-    importance = pd.Series(model.feature_importances_, index=X_tr.columns).sort_values(ascending=False)
-    results["top_features"] = importance.head(5).to_dict()
+    results["top_features"] = model.feature_importances.sort_values(ascending=False).head(5).to_dict()
+    with open(config.REPORTS_DIR / f"metrics_{slug}.json", "w") as f:
+        json.dump(results, f, indent=2, default=int)
     return results
 
 

@@ -13,6 +13,9 @@ DEFAULT_HOTEL = "City Hotel"
 HORIZON = 14
 
 # Time split (data covers arrivals from 2015-07-01 to 2017-08-31)
+# The first month is skipped: guests who arrived before 2015-07-01 are missing from the data,
+# so the first days show too few rooms sold.
+TRAIN_START = "2015-08-01"
 VALID_START = "2017-03-01"
 TEST_START = "2017-06-01"
 DATA_END = "2017-08-31"
