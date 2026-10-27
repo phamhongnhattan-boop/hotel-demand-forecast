@@ -8,6 +8,11 @@
     "RMSE": 9.638,
     "MAPE_%": 3.37
   },
+  "auto_arima": {
+    "MAE": 6.353,
+    "RMSE": 8.207,
+    "MAPE_%": 3.01
+  },
   "lightgbm": {
     "MAE": 5.836,
     "RMSE": 7.602,
