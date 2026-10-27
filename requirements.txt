@@ -5,6 +5,7 @@ lightgbm>=4.0
 matplotlib>=3.7
 pytest>=7.0
 ipykernel>=6.0      # to run notebooks in VS Code
+statsforecast>=1.7  # AutoARIMA
 # Only for the BigQuery part
 google-cloud-bigquery>=3.11
 pyarrow>=14.0
