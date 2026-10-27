@@ -58,5 +58,16 @@ def test_split_keeps_rows_with_missing_long_lags(raw):
     assert X_te.index.min() == pd.Timestamp("2017-06-01")
 
 
+def test_arima_forecasts_every_test_day(raw):
+    pytest.importorskip("statsforecast")
+    from arima import arima_forecast
+
+    daily = build_daily(raw, "Resort Hotel", "2017-08-31")
+    pred = arima_forecast(daily, 14, "2015-08-01", "2017-08-01", "2017-08-31")
+    assert len(pred) == 31
+    assert pred.index.min() == pd.Timestamp("2017-08-01")
+    assert (pred >= 0).all()
+
+
 def test_price_multiplier_order():
     assert multiplier(0.95) > multiplier(0.8) > multiplier(0.6) > multiplier(0.2)
