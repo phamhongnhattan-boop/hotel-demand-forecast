@@ -9,9 +9,23 @@ def naive_lag(horizon: int) -> int:
     return -(-horizon // 7) * 7
 
 
-def make_features(daily: pd.DataFrame, horizon: int, target: str = "rooms_sold") -> pd.DataFrame:
+def make_features(daily: pd.DataFrame, horizon: int, target: str = "rooms_sold",
+                  on_the_books: pd.Series | None = None) -> pd.DataFrame:
+    """Build the feature table.
+
+    on_the_books: rooms already booked for each date, known `horizon` days before
+    (see data_prep.build_on_the_books). Optional, so the old model can still be compared.
+    """
     y = daily[target]
     X = pd.DataFrame(index=daily.index)
+
+    # Booking pace: what the hotel already has on the books at forecast time
+    if on_the_books is not None:
+        otb = on_the_books.reindex(daily.index).fillna(0)
+        X[f"otb_{horizon}"] = otb
+        # Same idea one year earlier: how much of last year's demand was booked this early
+        otb_ly, y_ly = otb.shift(364), y.shift(364)
+        X["otb_ratio_ly"] = (otb_ly / y_ly.replace(0, float("nan")))
 
     # Calendar
     idx = daily.index

@@ -18,13 +18,22 @@
     "RMSE": 7.602,
     "MAPE_%": 2.78
   },
-  "lightgbm_best_iteration": 26,
-  "mae_improvement_%": 17.9,
+  "lightgbm_otb": {
+    "MAE": 4.289,
+    "RMSE": 5.505,
+    "MAPE_%": 2.03
+  },
+  "lightgbm_best_iteration": 286,
+  "mae_improvement_vs_naive_%": {
+    "auto_arima": 10.6,
+    "lightgbm": 17.9,
+    "lightgbm_otb": 39.7
+  },
   "top_features": {
-    "lag_14": 176,
-    "dayofyear": 125,
-    "roll_std_28": 93,
-    "roll_mean_28": 83,
-    "roll_mean_7": 67
+    "otb_14": 1385,
+    "lag_14": 1337,
+    "lag_21": 833,
+    "roll_mean_7": 823,
+    "lag_28": 765
   }
 }

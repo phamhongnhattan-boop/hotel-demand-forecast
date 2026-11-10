@@ -24,10 +24,19 @@ def make_sample(n_bookings: int = 40_000, seed: int = 0) -> pd.DataFrame:
     weekend = rng.integers(0, 3, n_bookings)
     week = rng.integers(0, 5, n_bookings)
     base = 80 + 40 * np.sin(2 * np.pi * (arrivals.dayofyear - 100) / 365)
+    is_canceled = (rng.random(n_bookings) < 0.3).astype(int)
+    lead_time = rng.integers(0, 300, n_bookings)
+    # Canceled: cancel date somewhere between booking date and arrival. Others: check-out date.
+    cancel_days_before = (rng.random(n_bookings) * lead_time).astype(int)
+    status_date = np.where(
+        is_canceled == 1,
+        arrivals - pd.to_timedelta(cancel_days_before, unit="D"),
+        arrivals + pd.to_timedelta(weekend + week, unit="D"),
+    )
     return pd.DataFrame({
         "hotel": rng.choice(["City Hotel", "Resort Hotel"], n_bookings, p=[0.65, 0.35]),
-        "is_canceled": (rng.random(n_bookings) < 0.3).astype(int),
-        "lead_time": rng.integers(0, 300, n_bookings),
+        "is_canceled": is_canceled,
+        "lead_time": lead_time,
         "arrival_date_year": arrivals.year,
         "arrival_date_month": [MONTH_NAMES[m - 1] for m in arrivals.month],
         "arrival_date_week_number": arrivals.isocalendar().week.to_numpy(),
@@ -36,6 +45,7 @@ def make_sample(n_bookings: int = 40_000, seed: int = 0) -> pd.DataFrame:
         "stays_in_week_nights": week,
         "adults": rng.integers(1, 4, n_bookings),
         "adr": np.round(base + rng.normal(0, 15, n_bookings), 2),
+        "reservation_status_date": pd.DatetimeIndex(status_date).strftime("%Y-%m-%d"),
     })
 
 

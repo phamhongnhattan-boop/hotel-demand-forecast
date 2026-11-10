@@ -1,0 +1,38 @@
+{
+  "hotel": "Resort Hotel",
+  "horizon_days": 14,
+  "test_period": "2016-09-01 -> 2017-08-31",
+  "n_folds": 12,
+  "overall": {
+    "seasonal_naive": {
+      "MAE": 18.871,
+      "RMSE": 29.495,
+      "MAPE_%": 15.68
+    },
+    "lightgbm": {
+      "MAE": 15.583,
+      "RMSE": 23.804,
+      "MAPE_%": 12.81
+    },
+    "lightgbm_otb": {
+      "MAE": 9.278,
+      "RMSE": 14.568,
+      "MAPE_%": 7.43
+    },
+    "auto_arima": {
+      "MAE": 17.526,
+      "RMSE": 26.865,
+      "MAPE_%": 15.11
+    }
+  },
+  "months_better_than_naive": {
+    "lightgbm": 9,
+    "lightgbm_otb": 11,
+    "auto_arima": 9
+  },
+  "mae_improvement_vs_naive_%": {
+    "lightgbm": 17.4,
+    "lightgbm_otb": 50.8,
+    "auto_arima": 7.1
+  }
+}

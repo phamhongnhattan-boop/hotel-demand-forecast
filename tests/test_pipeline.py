@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from data_prep import build_daily, load_raw  # noqa: E402
+from data_prep import build_daily, build_on_the_books, load_raw  # noqa: E402
 from features import make_features, naive_lag, split  # noqa: E402
 from pricing import multiplier  # noqa: E402
 from sample_data import make_sample  # noqa: E402
@@ -67,6 +67,44 @@ def test_arima_forecasts_every_test_day(raw):
     assert len(pred) == 31
     assert pred.index.min() == pd.Timestamp("2017-08-01")
     assert (pred >= 0).all()
+
+
+def _booking(lead_time, canceled=0, status_date="2016-01-12", arrival="2016-01-10", nights=2):
+    return {"hotel": "City Hotel", "arrival_date": pd.Timestamp(arrival), "total_nights": nights,
+            "adr": 100.0, "lead_time": lead_time, "is_canceled": canceled,
+            "reservation_status_date": status_date}
+
+
+def test_on_the_books_uses_only_info_known_at_cutoff():
+    # Night 2016-01-10, horizon 14 -> cutoff 2015-12-27
+    df = pd.DataFrame([
+        _booking(lead_time=30),                                    # booked 2015-12-11: counts
+        _booking(lead_time=5),                                     # booked after cutoff: no
+        _booking(lead_time=30, canceled=1, status_date="2015-12-20"),  # canceled before cutoff: no
+        _booking(lead_time=30, canceled=1, status_date="2016-01-05"),  # canceled after cutoff: counts
+    ])
+    otb = build_on_the_books(df, "City Hotel", horizon=14)
+    assert otb.loc["2016-01-10"] == 2
+    assert otb.loc["2016-01-11"] == 2   # second night of the same stays
+
+
+def test_backtest_folds_do_not_overlap():
+    from backtest import monthly_folds
+    folds = monthly_folds("2016-09-01", "2017-08-31")
+    assert len(folds) == 12
+    for valid_start, test_start, test_end in folds:
+        assert valid_start < test_start <= test_end
+    # each test month starts the day after the previous one ends
+    for (_, _, prev_end), (_, next_start, _) in zip(folds, folds[1:]):
+        assert next_start == prev_end + pd.Timedelta("1D")
+
+
+def test_features_include_on_the_books(raw):
+    daily = build_daily(raw, "City Hotel", "2017-08-31")
+    otb = build_on_the_books(raw, "City Hotel", 14)
+    X = make_features(daily, 14, on_the_books=otb)
+    assert "otb_14" in X and "otb_ratio_ly" in X
+    assert X["otb_14"].notna().all()
 
 
 def test_price_multiplier_order():

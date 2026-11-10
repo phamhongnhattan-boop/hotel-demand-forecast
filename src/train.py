@@ -1,5 +1,7 @@
 """Full pipeline: data -> features -> baseline vs AutoARIMA vs LightGBM -> price suggestion.
 
+Test period here is Jun-Aug 2017 only. For a test over a full year, see backtest.py.
+
     python src/train.py --hotel "City Hotel" --horizon 14
     python src/train.py --hotel "City Hotel" --no-arima     # skip AutoARIMA (faster)
 """
@@ -14,7 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import config
-from data_prep import build_daily, load_raw
+from data_prep import build_daily, build_on_the_books, load_raw
 from evaluate import metrics
 from features import make_features, split
 from models import ResidualLGBM, seasonal_naive
@@ -31,9 +33,12 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: bool = Tr
     raw = load_raw(data_path)
     daily = build_daily(raw, hotel, config.DATA_END)
 
-    X = make_features(daily, horizon)
+    otb = build_on_the_books(raw, hotel, horizon)
+    X = make_features(daily, horizon, on_the_books=otb)
     (X_tr, y_tr), (X_va, y_va), (X_te, y_te) = split(
         X, horizon, config.TRAIN_START, config.VALID_START, config.TEST_START)
+    otb_cols = [f"otb_{horizon}", "otb_ratio_ly"]
+    old_cols = [c for c in X_tr.columns if c not in otb_cols]
 
     # 1) Baseline
     naive = seasonal_naive(X_te, horizon)
@@ -49,9 +54,13 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: bool = Tr
             print("statsforecast is not installed -> AutoARIMA skipped (pip install statsforecast)")
 
     # 3) LightGBM on the residual (actual - naive), early stopping on the validation period
+    #    a) calendar + lag features only (first version, kept for comparison)
+    old = ResidualLGBM(horizon, config.RANDOM_STATE).fit(X_tr[old_cols], y_tr, X_va[old_cols], y_va)
+    preds["lightgbm"] = old.predict(X_te[old_cols])
+    #    b) + on-the-books features (rooms already booked 14 days before)
     model = ResidualLGBM(horizon, config.RANDOM_STATE).fit(X_tr, y_tr, X_va, y_va)
     gbm_pred = model.predict(X_te)
-    preds["lightgbm"] = gbm_pred
+    preds["lightgbm_otb"] = gbm_pred
 
     results = {
         "hotel": hotel,
@@ -62,7 +71,9 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: bool = Tr
         "lightgbm_best_iteration": model.best_iteration,
     }
     base_mae = results["seasonal_naive"]["MAE"]
-    results["mae_improvement_%"] = round((base_mae - results["lightgbm"]["MAE"]) / base_mae * 100, 1)
+    results["mae_improvement_vs_naive_%"] = {
+        name: round((base_mae - results[name]["MAE"]) / base_mae * 100, 1)
+        for name in preds if name != "seasonal_naive"}
 
     # 4) Price suggestion on the test period (from the LightGBM forecast)
     capacity = estimate_capacity(y_tr)
@@ -74,7 +85,7 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: bool = Tr
     prices = suggest_prices(gbm_pred, base_adr, capacity)
     prices.insert(0, "actual_rooms", y_te)
     for name, p in preds.items():
-        if name != "lightgbm":
+        if name != "lightgbm_otb":
             prices.insert(1, f"{name}_rooms", p.round(1))
 
     # 5) Save outputs
@@ -86,7 +97,8 @@ def run(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: bool = Tr
     ax.plot(y_te.index, y_te, label="Actual", lw=2, color="black")
     styles = {"seasonal_naive": ("Seasonal naive", "tab:orange"),
               "auto_arima": ("AutoARIMA", "tab:purple"),
-              "lightgbm": ("LightGBM", "tab:green")}
+              "lightgbm": ("LightGBM", "tab:blue"),
+              "lightgbm_otb": ("LightGBM + on-the-books", "tab:green")}
     for name, p in preds.items():
         label, color = styles[name]
         ax.plot(p.index, p, label=f"{label} (MAE {results[name]['MAE']:.2f})", color=color, alpha=0.8)
