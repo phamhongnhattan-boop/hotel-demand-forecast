@@ -1,15 +1,11 @@
 """Baseline and LightGBM forecasters."""
 from __future__ import annotations
 
-import warnings
-
 import lightgbm as lgb
 import pandas as pd
 
 from features import naive_lag
 
-# New LightGBM versions warn about `eval_set`; it still works in all 4.x versions.
-warnings.filterwarnings("ignore", message=".*eval_set.*deprecated.*")
 
 
 def seasonal_naive(X: pd.DataFrame, horizon: int) -> pd.Series:
@@ -45,7 +41,7 @@ class ResidualLGBM:
     def fit(self, X_train, y_train, X_valid, y_valid):
         self.model.fit(
             X_train, y_train - X_train[self.base],
-            eval_set=[(X_valid, y_valid - X_valid[self.base])],
+            eval_X=X_valid, eval_y=y_valid - X_valid[self.base],  # LightGBM >= 4.7
             eval_metric="l1",
             callbacks=[lgb.early_stopping(100, verbose=False)],
         )
@@ -80,7 +76,7 @@ class QuantileResidualLGBM(ResidualLGBM):
     def fit(self, X_train, y_train, X_valid, y_valid):
         self.model.fit(
             X_train, y_train - X_train[self.base],
-            eval_set=[(X_valid, y_valid - X_valid[self.base])],
+            eval_X=X_valid, eval_y=y_valid - X_valid[self.base],  # LightGBM >= 4.7
             eval_metric="quantile",
             callbacks=[lgb.early_stopping(100, verbose=False)],
         )

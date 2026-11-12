@@ -1,5 +1,7 @@
 # Hotel Demand Forecasting & Price Suggestion
 
+[![CI](https://github.com/phamhongnhattan-boop/hotel-demand-forecast/actions/workflows/ci.yml/badge.svg)](https://github.com/phamhongnhattan-boop/hotel-demand-forecast/actions/workflows/ci.yml)
+
 Forecast how many rooms a hotel will sell each day, 14 days ahead, then suggest a room price from that forecast.
 
 ## Problem
@@ -129,6 +131,7 @@ This is the kind of score that falls apart in production, so it is shown only as
 **Business check:** canceled bookings per arrival date (both hotels, Mar–Aug 2017), mean absolute error:
 one constant rate 9.7 · rate per segment 6.5 · **LightGBM 5.2**.
 Most useful features: deposit type, agent, previous cancellations, lead time.
+Training takes about 1 second on 78,703 bookings (laptop CPU).
 
 Limitation: the cancel rate went up in 2017 (40% in test vs 36% in train), so the model under-predicts a bit:
 −4% for City Hotel and −22% for Resort Hotel in total expected cancellations. In practice it should be
@@ -158,8 +161,9 @@ in a few seconds and needs no raw data.
 | A new library release breaks or changes the app | `requirements-app.txt` pins exact versions |
 | Error pages leak file paths | `.streamlit/config.toml` hides error details, keeps XSRF protection on, sets a 1 MB upload limit and turns off usage stats |
 | Secrets in the repo | The app needs no API key; `.env` is in `.gitignore` |
+| Libraries with known security holes | CI runs `pip-audit` on the pinned versions. It found 40 known CVEs in `pillow` 12.3 (pulled in by Streamlit), so the demo pins `pillow` 13.0 and Streamlit 1.66.1 |
 
-`tests/test_app.py` covers these checks (17 tests).
+`tests/test_app.py` covers these checks and also starts the real app and clicks through it (18 tests).
 
 ## How to run
 
@@ -189,6 +193,21 @@ Outputs go to `reports/`: metrics (JSON), forecast + suggested price per day (CS
 `bigquery/` has an upload script and ARIMA_PLUS SQL to run the same comparison in BigQuery ML
 (works in the free BigQuery sandbox). Not run yet.
 
+## Tests and CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push, on pull requests and every Monday
+(to catch a new library release that breaks the code):
+
+| Job | What it checks |
+|---|---|
+| Tests (Python 3.12 and 3.13) | 36 unit tests; a deprecation warning counts as an error |
+| Pipeline smoke run | Fake data → daily series → 12-month backtest → pricing test, end to end (the real CSV is not in the repo) |
+| Demo | Installs the pinned demo versions and starts the Streamlit app |
+| Security | `pip-audit` on the demo's dependencies |
+
+Speed (laptop CPU): one LightGBM fit takes 0.13–0.16 s, the full 12-month backtest with AutoARIMA
+about 30 s per hotel, the cancellation model about 1 s.
+
 ## Project structure
 
 ```
@@ -212,6 +231,7 @@ models/           cancellation model (LightGBM text) + allowed input values
 notebooks/        EDA
 bigquery/         optional BigQuery ML scripts
 tests/            unit tests
+.github/workflows CI (tests, smoke run, demo, pip-audit)
 ```
 
 ## Lesson learned

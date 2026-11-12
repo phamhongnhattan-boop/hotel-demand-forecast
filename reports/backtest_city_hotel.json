@@ -3,6 +3,7 @@
   "horizon_days": 14,
   "test_period": "2016-09-01 -> 2017-08-31",
   "n_folds": 12,
+  "lightgbm_otb_fit_seconds_per_fold": 0.13,
   "overall": {
     "seasonal_naive": {
       "MAE": 22.548,

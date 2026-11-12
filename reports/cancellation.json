@@ -3,6 +3,7 @@
   "valid": "2017-01-01 -> 2017-03-01 (7858 bookings)",
   "test": "2017-03-01 -> 2017-08-31 (32829 bookings)",
   "test_cancel_rate": 0.4,
+  "lightgbm_fit_seconds": 1.2,
   "models": {
     "rate_baseline": {
       "roc_auc": 0.7,

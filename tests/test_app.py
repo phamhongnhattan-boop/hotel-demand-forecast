@@ -58,3 +58,15 @@ def test_saved_model_gives_a_probability():
     p_nonrefund = booster.predict(booking_row(good_form(deposit_type="Non Refund"), META))[0]
     assert 0 <= p_free <= 1 and 0 <= p_nonrefund <= 1
     assert p_nonrefund > p_free   # non-refundable deposits almost always cancel in this data
+
+
+def test_demo_runs_without_errors():
+    """Start the real Streamlit app (no browser) and click through it."""
+    testing = pytest.importorskip("streamlit.testing.v1")
+    at = testing.AppTest.from_file(str(ROOT / "app" / "streamlit_app.py"), default_timeout=60).run()
+    assert not at.exception
+    at.radio[0].set_value("Resort Hotel").run()
+    assert not at.exception
+    at.button[0].click().run()   # "Predict" in the cancellation tab
+    assert not at.exception
+    assert any(m.label == "Cancel probability" for m in at.metric)

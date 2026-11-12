@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 
 import lightgbm as lgb
 import matplotlib
@@ -86,7 +87,7 @@ def fit_lgbm(train, valid, features, random_state=config.RANDOM_STATE):
                                colsample_bytree=0.8, random_state=random_state, verbose=-1)
     Xtr = _to_lgb(train[features], cats)
     Xva = _to_lgb(valid[features], cats, ref=train)
-    model.fit(Xtr, train[TARGET], eval_set=[(Xva, valid[TARGET])], eval_metric="binary_logloss",
+    model.fit(Xtr, train[TARGET], eval_X=Xva, eval_y=valid[TARGET], eval_metric="binary_logloss",
               callbacks=[lgb.early_stopping(100, verbose=False)])
     return lambda d: model.predict_proba(_to_lgb(d[features], cats, ref=train))[:, 1], model
 
@@ -135,7 +136,9 @@ def run(data_path=config.RAW_CSV):
 
     rate = fit_rate_baseline(train)
     logreg = fit_logreg(train)
+    t0 = time.perf_counter()
     lgbm, lgbm_model = fit_lgbm(train, valid, SAFE_FEATURES)
+    fit_seconds = round(time.perf_counter() - t0, 1)
     leaky, _ = fit_lgbm(train, valid, SAFE_FEATURES + LEAKY_EXTRA)
 
     preds = {"rate_baseline": rate(test), "logistic_regression": logreg(test),
@@ -156,6 +159,7 @@ def run(data_path=config.RAW_CSV):
         "valid": f"{VALID_START} -> {TEST_START} ({len(valid)} bookings)",
         "test": f"{TEST_START} -> {config.DATA_END} ({len(test)} bookings)",
         "test_cancel_rate": round(float(y.mean()), 3),
+        "lightgbm_fit_seconds": fit_seconds,
         "models": models,
         "daily_cancellations_MAE": daily,
         "top_features": (importance / importance.sum()).sort_values(ascending=False).head(8).round(3).to_dict(),

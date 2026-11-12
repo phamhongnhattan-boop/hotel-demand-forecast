@@ -1,7 +1,8 @@
 # Exact versions for the Streamlit demo (tested together).
 # Pinned so a new release cannot silently change or break the deployed app.
-streamlit==1.64.0
+streamlit==1.66.1
+pillow==13.0.0      # older pillow has known CVEs (found by pip-audit)
 altair==5.5.0
 lightgbm==4.7.0
 pandas==2.3.3
-numpy==2.5.3
+numpy==2.4.6

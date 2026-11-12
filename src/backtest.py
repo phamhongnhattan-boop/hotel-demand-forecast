@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 
 import matplotlib
 matplotlib.use("Agg")
@@ -52,7 +53,7 @@ def run_backtest(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: 
         "lightgbm_otb": [c for c in X.columns if c != target],
     }
 
-    rows, daily_preds = [], []
+    rows, daily_preds, fit_seconds = [], [], []
     for valid_start, test_start, test_end in monthly_folds():
         train = X[X.index < valid_start]
         valid = X[(X.index >= valid_start) & (X.index < test_start)]
@@ -61,8 +62,11 @@ def run_backtest(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: 
 
         preds = {"seasonal_naive": test[base]}
         for name, cols in feature_sets.items():
+            t0 = time.perf_counter()
             model = ResidualLGBM(horizon, config.RANDOM_STATE).fit(
                 train[cols], train[target], valid[cols], valid[target])
+            if name == "lightgbm_otb":
+                fit_seconds.append(time.perf_counter() - t0)
             preds[name] = model.predict(test[cols])
         if use_arima:
             from arima import arima_forecast
@@ -83,6 +87,7 @@ def run_backtest(hotel: str, horizon: int, data_path=config.RAW_CSV, use_arima: 
         "horizon_days": horizon,
         "test_period": f"{all_days.index.min().date()} -> {all_days.index.max().date()}",
         "n_folds": len(table),
+        "lightgbm_otb_fit_seconds_per_fold": round(sum(fit_seconds) / len(fit_seconds), 2),
         # MAE over all test days (not the mean of monthly MAE)
         "overall": {m: metrics(all_days["actual"], all_days[m]) for m in models},
         "months_better_than_naive": {
