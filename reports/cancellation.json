@@ -1,0 +1,43 @@
+{
+  "train": "arrivals before 2017-01-01 (78703 bookings)",
+  "valid": "2017-01-01 -> 2017-03-01 (7858 bookings)",
+  "test": "2017-03-01 -> 2017-08-31 (32829 bookings)",
+  "test_cancel_rate": 0.4,
+  "models": {
+    "rate_baseline": {
+      "roc_auc": 0.7,
+      "pr_auc": 0.628,
+      "brier": 0.1924
+    },
+    "logistic_regression": {
+      "roc_auc": 0.793,
+      "pr_auc": 0.76,
+      "brier": 0.1734
+    },
+    "lightgbm": {
+      "roc_auc": 0.81,
+      "pr_auc": 0.778,
+      "brier": 0.1676
+    },
+    "lightgbm_LEAKY": {
+      "roc_auc": 0.895,
+      "pr_auc": 0.856,
+      "brier": 0.1375
+    }
+  },
+  "daily_cancellations_MAE": {
+    "constant_rate": 9.68,
+    "rate_baseline": 6.54,
+    "lightgbm": 5.17
+  },
+  "top_features": {
+    "deposit_type": 0.38,
+    "agent": 0.176,
+    "previous_cancellations": 0.112,
+    "lead_time": 0.11,
+    "adr": 0.048,
+    "customer_type": 0.038,
+    "arrival_week": 0.025,
+    "previous_bookings_not_canceled": 0.018
+  }
+}

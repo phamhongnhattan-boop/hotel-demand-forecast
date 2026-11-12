@@ -7,6 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import cancellation as canc  # noqa: E402
 from data_prep import build_daily, build_on_the_books, load_raw  # noqa: E402
 from features import make_features, naive_lag, split  # noqa: E402
 from intervals import IntervalForecaster, conformal_offset, interval_metrics  # noqa: E402
@@ -149,3 +150,52 @@ def test_score_actions_counts():
     s = score_actions(actions, actual, 100)
     assert s["raise"] == {"days": 2, "precision_%": 50.0, "recall_%": 50.0, "wrong_days": 1}
     assert s["discount"] == {"days": 1, "precision_%": 100.0, "recall_%": 50.0, "wrong_days": 0}
+
+
+# ---------- Cancellation prediction ----------
+def _bookings(n=3000, seed=0):
+    """Small fake booking table with every column the cancellation model uses."""
+    rng = np.random.default_rng(seed)
+    arrival = pd.Timestamp("2016-01-01") + pd.to_timedelta(rng.integers(0, 600, n), unit="D")
+    deposit = rng.choice(["No Deposit", "Non Refund"], n, p=[0.85, 0.15])
+    lead = rng.integers(0, 300, n)
+    p = np.where(deposit == "Non Refund", 0.95, 0.1 + lead / 600)
+    df = pd.DataFrame({
+        "hotel": rng.choice(["City Hotel", "Resort Hotel"], n), "is_canceled": (rng.random(n) < p).astype(int),
+        "arrival_date": arrival, "lead_time": lead, "deposit_type": deposit,
+        "stays_in_weekend_nights": rng.integers(0, 3, n), "stays_in_week_nights": rng.integers(1, 5, n),
+        "adults": 2, "children": 0.0, "babies": 0, "meal": "BB", "market_segment": "Online TA",
+        "distribution_channel": "TA/TO", "reserved_room_type": "A", "assigned_room_type": "A",
+        "customer_type": "Transient", "agent": rng.choice([9.0, 240.0, np.nan], n), "company": np.nan,
+        "is_repeated_guest": 0, "previous_cancellations": 0, "previous_bookings_not_canceled": 0,
+        "days_in_waiting_list": 0, "adr": rng.uniform(50, 200, n), "country": "PRT",
+        "required_car_parking_spaces": 0, "booking_changes": 0, "total_of_special_requests": 0,
+    })
+    return canc.prepare(df)
+
+
+def test_cancellation_uses_no_leaky_columns():
+    leaky = set(canc.LEAKY_EXTRA) | {"reservation_status", "reservation_status_date", "is_canceled"}
+    assert not leaky & set(canc.SAFE_FEATURES)
+
+
+def test_cancellation_split_is_by_arrival_time():
+    train, valid, test = canc.split(_bookings())
+    assert train["arrival_date"].max() < valid["arrival_date"].min()
+    assert valid["arrival_date"].max() < test["arrival_date"].min()
+
+
+def test_cancellation_model_beats_coin_flip():
+    train, valid, test = canc.split(_bookings(6000))
+    predict, _ = canc.fit_lgbm(train, valid, canc.SAFE_FEATURES)
+    p = predict(test)
+    assert ((p >= 0) & (p <= 1)).all()
+    assert canc.classification_metrics(test["is_canceled"], p)["roc_auc"] > 0.7
+
+
+def test_expected_cancellations_sum_probabilities():
+    d = pd.DataFrame({"hotel": ["City Hotel"] * 3, "arrival_date": pd.to_datetime(["2017-03-01"] * 2 + ["2017-03-02"]),
+                      "is_canceled": [1, 0, 1]})
+    e = canc.expected_cancellations(d, np.array([0.5, 0.25, 0.9]))
+    assert e["predicted"].round(2).tolist() == [0.75, 0.9]
+    assert e["actual"].tolist() == [1, 1]

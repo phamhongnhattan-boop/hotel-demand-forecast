@@ -104,6 +104,38 @@ cannot be learned here; the backtest only shows the trade-off clearly.
 
 ![pricing](reports/pricing_city_hotel.png)
 
+### 4. Cancellation prediction (at booking time)
+
+About 37% of bookings in the data are canceled. If the hotel knows the cancel probability of each booking,
+the sum over all bookings for a night gives the **expected cancellations**, which tells how many rooms can be
+resold or safely overbooked.
+
+- **Only data known when the booking comes in.** Dropped on purpose: `required_car_parking_spaces`
+  (filled at check-in: 0% of bookings with parking cancel), `assigned_room_type`, `booking_changes`,
+  `total_of_special_requests`, `country` (set at check-in for many guests) and `reservation_status`.
+- **Split by arrival date:** train on arrivals before Jan 2017 (outcome already known),
+  early stopping on Jan–Feb 2017, test on Mar–Aug 2017 (32,829 bookings, 40% canceled).
+
+| Model | ROC-AUC | PR-AUC | Brier |
+|---|---|---|---|
+| Past cancel rate per hotel × deposit × segment | 0.700 | 0.628 | 0.192 |
+| Logistic regression | 0.793 | 0.760 | 0.173 |
+| **LightGBM** | **0.810** | **0.778** | **0.168** |
+| LightGBM *with leaky columns* (not valid) | 0.895 | 0.856 | 0.138 |
+
+The leaky version looks much better, but it uses information the hotel does not have at booking time.
+This is the kind of score that falls apart in production, so it is shown only as a warning.
+
+**Business check:** canceled bookings per arrival date (both hotels, Mar–Aug 2017), mean absolute error:
+one constant rate 9.7 · rate per segment 6.5 · **LightGBM 5.2**.
+Most useful features: deposit type, agent, previous cancellations, lead time.
+
+Limitation: the cancel rate went up in 2017 (40% in test vs 36% in train), so the model under-predicts a bit:
+−4% for City Hotel and −22% for Resort Hotel in total expected cancellations. In practice it should be
+re-trained every month.
+
+![cancellation](reports/cancellation.png)
+
 ## How to run
 
 ```bash
@@ -120,11 +152,12 @@ python src/train.py --hotel "Resort Hotel"
 python src/backtest.py --hotel "City Hotel"            # 12-month backtest
 python src/backtest.py --hotel "City Hotel" --arima    # + AutoARIMA (slow)
 python src/price_backtest.py --hotel "City Hotel"      # intervals + pricing test
+python src/cancellation.py                            # cancellation model
 python -m pytest -q
 ```
 
 Outputs go to `reports/`: metrics (JSON), forecast + suggested price per day (CSV), charts (PNG),
-`backtest_*.csv/json/png` for the 12-month backtest, and `pricing_*.csv/json/png` for the pricing test.
+`backtest_*.csv/json/png` for the 12-month backtest, `pricing_*.csv/json/png` for the pricing test, and `cancellation*` for the cancellation model.
 
 ### Optional: BigQuery ML
 
@@ -144,6 +177,7 @@ src/
   intervals.py    P10/P90 quantile models + conformal calibration
   pricing.py      price rules (v1 point, v2 interval) and their scoring
   price_backtest.py  12-month test of intervals and price decisions
+  cancellation.py cancel probability per booking (no leaky columns)
   train.py        full pipeline (summer test + price suggestion)
   backtest.py     12-month rolling backtest
 notebooks/        EDA
