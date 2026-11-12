@@ -162,7 +162,23 @@ def run(data_path=config.RAW_CSV):
     }
     calib = calibration_table(y, preds["lightgbm"])
     exp = expected_cancellations(test, preds["lightgbm"])
-    return summary, calib, exp
+    return summary, calib, exp, (lgbm_model, train)
+
+
+def export_model(model, train: pd.DataFrame, summary: dict, out_dir=config.MODELS_DIR) -> None:
+    """Save the model as LightGBM TEXT (not pickle: loading a pickle can run any code)
+    plus the allowed values of every input, used by the demo to validate user input."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    model.booster_.save_model(str(out_dir / "cancel_lgbm.txt"))
+    meta = {
+        "features": SAFE_FEATURES,
+        "categories": {c: sorted(train[c].astype(str).unique().tolist()) for c in CATEGORICAL},
+        "numeric_ranges": {c: [float(train[c].min()), float(train[c].max())] for c in NUMERIC},
+        "trained_on": summary["train"],
+        "test_metrics": summary["models"]["lightgbm"],
+    }
+    with open(out_dir / "cancel_meta.json", "w") as f:
+        json.dump(meta, f, indent=1)
 
 
 def save_outputs(summary, calib, exp) -> None:
@@ -190,6 +206,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default=str(config.RAW_CSV))
     args = parser.parse_args()
-    summary, calib, exp = run(args.data)
+    summary, calib, exp, (model, train) = run(args.data)
     save_outputs(summary, calib, exp)
+    export_model(model, train, summary)
     print(json.dumps(summary, indent=2))

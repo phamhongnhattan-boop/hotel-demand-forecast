@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW_CSV = ROOT / "data" / "raw" / "hotel_bookings.csv"
 PROCESSED_DIR = ROOT / "data" / "processed"
 REPORTS_DIR = ROOT / "reports"
+MODELS_DIR = ROOT / "models"
 
 # Hotels in the dataset: "City Hotel" (Lisbon) and "Resort Hotel" (Algarve)
 DEFAULT_HOTEL = "City Hotel"

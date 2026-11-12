@@ -1,0 +1,12 @@
+# Safer defaults for the public demo
+[server]
+maxUploadSize = 1            # MB; the app has no upload, keep the limit tiny anyway
+enableXsrfProtection = true
+enableCORS = true
+
+[client]
+showErrorDetails = "none"    # do not show stack traces / file paths to visitors
+toolbarMode = "viewer"
+
+[browser]
+gatherUsageStats = false

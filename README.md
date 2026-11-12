@@ -136,6 +136,31 @@ re-trained every month.
 
 ![cancellation](reports/cancellation.png)
 
+## Demo (Streamlit)
+
+```bash
+pip install -r requirements-app.txt
+streamlit run app/streamlit_app.py
+```
+
+Three tabs: **Price suggestion** (pick a hotel, a month and a base price; see the 80% band, the real
+demand and which raises were right), **Cancellation risk** (cancel probability of one new booking) and
+**Model results**. The app only reads files already in the repo (`reports/`, `models/`), so it starts
+in a few seconds and needs no raw data.
+
+### Security of the demo
+
+| Risk | What the app does |
+|---|---|
+| Bad or crafted input (negative price, NaN, 10,000-day lead time, unknown category, HTML) | Every value is checked again on the server side in `app/validation.py` (widgets alone can be bypassed): numbers must be finite and inside the training range, categories must be a value seen in training |
+| Path traversal through the hotel name | Hotel names map to a fixed list of file names; anything else is refused |
+| Loading a model file that runs code | The model is saved as LightGBM **text**, not pickle |
+| A new library release breaks or changes the app | `requirements-app.txt` pins exact versions |
+| Error pages leak file paths | `.streamlit/config.toml` hides error details, keeps XSRF protection on, sets a 1 MB upload limit and turns off usage stats |
+| Secrets in the repo | The app needs no API key; `.env` is in `.gitignore` |
+
+`tests/test_app.py` covers these checks (17 tests).
+
 ## How to run
 
 ```bash
@@ -152,7 +177,7 @@ python src/train.py --hotel "Resort Hotel"
 python src/backtest.py --hotel "City Hotel"            # 12-month backtest
 python src/backtest.py --hotel "City Hotel" --arima    # + AutoARIMA (slow)
 python src/price_backtest.py --hotel "City Hotel"      # intervals + pricing test
-python src/cancellation.py                            # cancellation model
+python src/cancellation.py                            # cancellation model -> models/
 python -m pytest -q
 ```
 
@@ -180,6 +205,10 @@ src/
   cancellation.py cancel probability per booking (no leaky columns)
   train.py        full pipeline (summer test + price suggestion)
   backtest.py     12-month rolling backtest
+app/
+  streamlit_app.py  demo
+  validation.py     server-side input checks
+models/           cancellation model (LightGBM text) + allowed input values
 notebooks/        EDA
 bigquery/         optional BigQuery ML scripts
 tests/            unit tests
