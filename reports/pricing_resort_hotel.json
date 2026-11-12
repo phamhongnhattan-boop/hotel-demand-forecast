@@ -1,0 +1,42 @@
+{
+  "hotel": "Resort Hotel",
+  "horizon_days": 14,
+  "test_period": "2016-09-01 -> 2017-08-31",
+  "point_forecast": {
+    "MAE": 9.218,
+    "RMSE": 14.415,
+    "MAPE_%": 7.39
+  },
+  "interval_80": {
+    "coverage_%": 80.0,
+    "mean_width_rooms": 28.6
+  },
+  "pricing_v1_point": {
+    "raise": {
+      "days": 208,
+      "precision_%": 89.4,
+      "recall_%": 86.9,
+      "wrong_days": 22
+    },
+    "discount": {
+      "days": 27,
+      "precision_%": 85.2,
+      "recall_%": 62.2,
+      "wrong_days": 4
+    }
+  },
+  "pricing_v2_interval": {
+    "raise": {
+      "days": 144,
+      "precision_%": 97.9,
+      "recall_%": 65.9,
+      "wrong_days": 3
+    },
+    "discount": {
+      "days": 11,
+      "precision_%": 90.9,
+      "recall_%": 27.0,
+      "wrong_days": 1
+    }
+  }
+}

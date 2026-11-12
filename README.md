@@ -35,7 +35,8 @@ Full analysis: [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb)
 | On-the-books | Rooms already booked for the date, as known 14 days before (booking date = arrival − lead time; canceled bookings count until their cancel date) + the same booked/actual ratio one year earlier |
 | Models | Seasonal naive (same weekday, 14 days earlier) · AutoARIMA (weekly season, rolling origin) · LightGBM on the residual (actual − naive, early stopping) |
 | Evaluation | Every test day is forecast exactly 14 days ahead, for all models. Two tests: summer only (Jun–Aug 2017) and a 12-month rolling backtest (Sep 2016 → Aug 2017) |
-| Pricing | Occupancy = forecast (LightGBM + on-the-books) / capacity (95th percentile of rooms sold) → price multiplier |
+| Intervals | Quantile LightGBM (P10, P90) on the residual, calibrated with conformalized quantile regression (CQR) on the validation months |
+| Pricing | Occupancy = forecast / capacity (95th percentile of rooms sold). v1 uses the point forecast; v2 raises only when P10 says ≥ 90% full. Both are scored against what really happened |
 
 ## Results
 
@@ -73,6 +74,36 @@ the first version showed −18% MAE on summer data but only −10% (City) over a
 
 ![forecast](reports/forecast_city_hotel.png)
 
+### 3. Price suggestion, tested (Sep 2016 → Aug 2017)
+
+A price rule is only useful if its decisions are right. The backtest checks every +15% raise
+against the real occupancy of that day: a raise on a day that ended below 90% full is a **wrong raise**
+(the hotel risks losing guests).
+
+**80% interval.** Raw quantile models were over-confident: the [P10, P90] band held the real value only
+66% (City) and 63% (Resort) of the time. After CQR calibration on the 2 validation months of each fold:
+
+| Hotel | Point MAE | Interval coverage (target 80%) | Mean width |
+|---|---|---|---|
+| City Hotel | 9.3 | **80.3%** | 32 rooms |
+| Resort Hotel | 9.2 | **80.0%** | 29 rooms |
+
+**Raise +15% (day really ≥ 90% full?)**
+
+| Hotel | Rule | Days raised | Precision | Recall | Wrong raises |
+|---|---|---|---|---|---|
+| City Hotel | v1: point forecast ≥ 90% | 212 | 93.9% | 86.9% | 13 |
+| City Hotel | **v2: P10 ≥ 90%** | 149 | **98.0%** | 63.8% | **3** |
+| Resort Hotel | v1: point forecast ≥ 90% | 208 | 89.4% | 86.9% | 22 |
+| Resort Hotel | **v2: P10 ≥ 90%** | 144 | **97.9%** | 65.9% | **3** |
+
+v2 cuts wrong raises from 13 → 3 (City) and 22 → 3 (Resort). The cost: it misses about a third of the
+full days, which get a +5% raise instead of +15%. Which rule is better depends on what the hotel fears more:
+losing guests (v2) or leaving money on the table (v1). The data has no price elasticity, so this choice
+cannot be learned here; the backtest only shows the trade-off clearly.
+
+![pricing](reports/pricing_city_hotel.png)
+
 ## How to run
 
 ```bash
@@ -88,11 +119,12 @@ python src/train.py --hotel "City Hotel"
 python src/train.py --hotel "Resort Hotel"
 python src/backtest.py --hotel "City Hotel"            # 12-month backtest
 python src/backtest.py --hotel "City Hotel" --arima    # + AutoARIMA (slow)
+python src/price_backtest.py --hotel "City Hotel"      # intervals + pricing test
 python -m pytest -q
 ```
 
 Outputs go to `reports/`: metrics (JSON), forecast + suggested price per day (CSV), charts (PNG),
-and `backtest_*.csv/json/png` for the 12-month backtest.
+`backtest_*.csv/json/png` for the 12-month backtest, and `pricing_*.csv/json/png` for the pricing test.
 
 ### Optional: BigQuery ML
 
@@ -109,7 +141,9 @@ src/
   models.py       seasonal naive, residual LightGBM
   arima.py        AutoARIMA (statsforecast), rolling origin
   evaluate.py     MAE, RMSE, MAPE
-  pricing.py      price suggestion rules
+  intervals.py    P10/P90 quantile models + conformal calibration
+  pricing.py      price rules (v1 point, v2 interval) and their scoring
+  price_backtest.py  12-month test of intervals and price decisions
   train.py        full pipeline (summer test + price suggestion)
   backtest.py     12-month rolling backtest
 notebooks/        EDA
@@ -134,7 +168,7 @@ halved the full-year error.
 ## Limitations and next steps
 
 - The dataset has no room count, so capacity is estimated.
-- Pricing rules are hand-made, not learned from price elasticity.
+- Pricing rules are hand-made, not learned from price elasticity; the backtest scores decisions, not revenue.
 - On-the-books is rebuilt from `lead_time` and the cancel date; a real PMS would give exact daily snapshots.
 - Only one year of backtest is possible with this data (2 years in total, and the model needs 1 year of history).
 - Data is from Portugal (2015–2017), so patterns may differ from Vietnamese hotels.

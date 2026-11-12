@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -8,7 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data_prep import build_daily, build_on_the_books, load_raw  # noqa: E402
 from features import make_features, naive_lag, split  # noqa: E402
-from pricing import multiplier  # noqa: E402
+from intervals import IntervalForecaster, conformal_offset, interval_metrics  # noqa: E402
+from pricing import interval_actions, multiplier, score_actions  # noqa: E402
 from sample_data import make_sample  # noqa: E402
 
 
@@ -109,3 +111,41 @@ def test_features_include_on_the_books(raw):
 
 def test_price_multiplier_order():
     assert multiplier(0.95) > multiplier(0.8) > multiplier(0.6) > multiplier(0.2)
+
+
+# ---------- Intervals + tested pricing ----------
+def test_conformal_offset_reaches_target_coverage():
+    rng = np.random.default_rng(0)
+    y = rng.normal(0, 1, 2000)
+    lo, hi = np.full(2000, -0.5), np.full(2000, 0.5)   # far too narrow: ~38% coverage
+    off = conformal_offset(lo, hi, y, 0.8)
+    assert off > 0
+    cov = interval_metrics(y, lo - off, hi + off)["coverage_%"]
+    assert 79 <= cov <= 82
+
+
+def test_interval_forecaster_gives_ordered_band(raw):
+    daily = build_daily(raw, "City Hotel", "2017-08-31")
+    X = make_features(daily, 14).dropna(subset=["lag_14"])
+    cols = [c for c in X.columns if c != "rooms_sold"]
+    tr, va, te = X[:"2016-12-31"], X["2017-01-01":"2017-02-28"], X["2017-03-01":]
+    band = IntervalForecaster(14, 0.8).fit(tr[cols], tr["rooms_sold"], va[cols], va["rooms_sold"]).predict(te[cols])
+    assert (band["p10"] <= band["p90"]).all() and (band["p10"] >= 0).all()
+
+
+def test_interval_actions_need_confidence():
+    idx = pd.RangeIndex(4)
+    p10 = pd.Series([95, 70, 10, 40], index=idx)
+    p50 = pd.Series([98, 92, 30, 60], index=idx)
+    p90 = pd.Series([100, 99, 45, 80], index=idx)
+    acts = interval_actions(p10, p50, p90, capacity=100).tolist()
+    # day 1: point forecast says 92% full, but P10 is only 70% -> small raise, not +15%
+    assert acts == ["raise", "small_raise", "discount", "keep"]
+
+
+def test_score_actions_counts():
+    actions = pd.Series(["raise", "raise", "keep", "discount", "keep"])
+    actual = pd.Series([95, 80, 92, 30, 40])          # rooms, capacity 100
+    s = score_actions(actions, actual, 100)
+    assert s["raise"] == {"days": 2, "precision_%": 50.0, "recall_%": 50.0, "wrong_days": 1}
+    assert s["discount"] == {"days": 1, "precision_%": 100.0, "recall_%": 50.0, "wrong_days": 0}

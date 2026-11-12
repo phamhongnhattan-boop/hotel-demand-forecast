@@ -1,0 +1,42 @@
+{
+  "hotel": "City Hotel",
+  "horizon_days": 14,
+  "test_period": "2016-09-01 -> 2017-08-31",
+  "point_forecast": {
+    "MAE": 9.28,
+    "RMSE": 13.429,
+    "MAPE_%": 5.44
+  },
+  "interval_80": {
+    "coverage_%": 80.3,
+    "mean_width_rooms": 32.1
+  },
+  "pricing_v1_point": {
+    "raise": {
+      "days": 212,
+      "precision_%": 93.9,
+      "recall_%": 86.9,
+      "wrong_days": 13
+    },
+    "discount": {
+      "days": 21,
+      "precision_%": 95.2,
+      "recall_%": 83.3,
+      "wrong_days": 1
+    }
+  },
+  "pricing_v2_interval": {
+    "raise": {
+      "days": 149,
+      "precision_%": 98.0,
+      "recall_%": 63.8,
+      "wrong_days": 3
+    },
+    "discount": {
+      "days": 9,
+      "precision_%": 100.0,
+      "recall_%": 37.5,
+      "wrong_days": 0
+    }
+  }
+}

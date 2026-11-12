@@ -62,3 +62,26 @@ class ResidualLGBM:
     @property
     def feature_importances(self) -> pd.Series:
         return pd.Series(self.model.feature_importances_, index=self.model.feature_name_)
+
+
+class QuantileResidualLGBM(ResidualLGBM):
+    """Same residual idea, but predicts a quantile (alpha) instead of the mean.
+
+    alpha=0.1 -> P10 (a low estimate: actual demand is above it ~90% of the time)
+    alpha=0.9 -> P90 (a high estimate)
+    Together they give an 80% prediction interval around the point forecast.
+    """
+
+    def __init__(self, horizon: int, alpha: float, random_state: int = 42):
+        super().__init__(horizon, random_state)
+        self.alpha = alpha
+        self.model.set_params(objective="quantile", alpha=alpha)
+
+    def fit(self, X_train, y_train, X_valid, y_valid):
+        self.model.fit(
+            X_train, y_train - X_train[self.base],
+            eval_set=[(X_valid, y_valid - X_valid[self.base])],
+            eval_metric="quantile",
+            callbacks=[lgb.early_stopping(100, verbose=False)],
+        )
+        return self
