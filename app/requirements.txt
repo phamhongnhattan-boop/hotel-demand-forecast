@@ -1,0 +1,8 @@
+# Used by Streamlit Community Cloud (it reads requirements.txt next to the app file first).
+# Must stay the same as ../requirements-app.txt (checked by tests/test_app.py).
+streamlit==1.66.1
+pillow==13.0.0      # older pillow has known CVEs (found by pip-audit)
+altair==5.5.0
+lightgbm==4.7.0
+pandas==2.3.3
+numpy==2.4.6

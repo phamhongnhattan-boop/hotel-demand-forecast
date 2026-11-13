@@ -70,3 +70,11 @@ def test_demo_runs_without_errors():
     at.button[0].click().run()   # "Predict" in the cancellation tab
     assert not at.exception
     assert any(m.label == "Cancel probability" for m in at.metric)
+
+
+def test_cloud_requirements_match_pinned_demo_versions():
+    """Streamlit Cloud installs app/requirements.txt; CI tests requirements-app.txt. They must not drift."""
+    def pins(path):
+        return sorted(line.split("#")[0].strip() for line in path.read_text().splitlines()
+                      if line.split("#")[0].strip())
+    assert pins(ROOT / "app" / "requirements.txt") == pins(ROOT / "requirements-app.txt")
