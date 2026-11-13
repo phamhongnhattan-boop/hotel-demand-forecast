@@ -4,6 +4,8 @@
 
 Forecast how many rooms a hotel will sell each day, 14 days ahead, then suggest a room price from that forecast.
 
+**Live demo:** https://hotel-demand-forecast-tan.streamlit.app (Streamlit Community Cloud; it sleeps when unused, so the first visit can take ~30 s)
+
 ## Problem
 
 Hotels need to know future demand early to set prices and plan staff. This project:
@@ -140,6 +142,8 @@ re-trained every month.
 ![cancellation](reports/cancellation.png)
 
 ## Demo (Streamlit)
+
+Online: https://hotel-demand-forecast-tan.streamlit.app. Run it locally:
 
 ```bash
 pip install -r requirements-app.txt
